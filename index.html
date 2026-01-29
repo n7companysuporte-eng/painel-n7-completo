@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<title>Painel N7 Completo</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI',sans-serif;}
+body{background:#f0f2f5;color:#333;display:flex;min-height:100vh;}
+nav{width:220px;background:#1f1f2e;color:#fff;display:flex;flex-direction:column;padding:20px;}
+nav h2{margin-bottom:20px;font-size:1.2rem;text-align:center;}
+nav button{margin-bottom:10px;padding:10px;border:none;background:#2a2a40;color:#fff;border-radius:6px;cursor:pointer;text-align:left;}
+nav button:hover{background:#414158;}
+main{flex:1;padding:30px;overflow-y:auto;}
+.card{background:#fff;padding:20px;border-radius:10px;margin-bottom:20px;box-shadow:0 4px 10px rgba(0,0,0,0.1);}
+input,textarea,select,button{padding:10px;margin:5px 0;width:100%;border-radius:6px;border:1px solid #ccc;}
+button.btn-add{background:#1f1f2e;color:#fff;}
+button.btn-remove{background:#e74c3c;color:#fff;}
+table{width:100%;border-collapse:collapse;margin-top:10px;}
+th,td{padding:10px;text-align:left;border-bottom:1px solid #ddd;}
+th{background:#f4f4f4;}
+.status-ok{color:green;font-weight:bold;}
+.status-pendente{color:orange;font-weight:bold;}
+#alertContainer{position:fixed;top:10px;right:10px;width:320px;z-index:1000;}
+.alert{background:#fffae5;padding:10px;margin-bottom:10px;border-left:5px solid #ffc107;border-radius:6px;box-shadow:0 2px 5px rgba(0,0,0,0.2);}
+</style>
+</head>
+<body>
+
+<nav>
+<h2>N7 Painel Completo</h2>
+<button onclick="mostrarAba('clientes')">Clientes</button>
+<button onclick="mostrarAba('postagens')">Postagens</button>
+<button onclick="mostrarAba('leadsAnuncios')">Leads Anúncios</button>
+<button onclick="mostrarAba('remarketing')">Remarketing</button>
+<button onclick="mostrarAba('disparo')">Disparo</button>
+<button onclick="mostrarAba('faturamento')">Faturamento</button>
+</nav>
+
+<main>
+<div id="alertContainer"></div>
+
+<!-- CLIENTES -->
+<div id="clientes" class="card">
+<h2>Adicionar Cliente</h2>
+<input id="clienteNome" placeholder="Nome">
+<input id="clienteTelefone" placeholder="Telefone">
+<input id="clienteValor" type="number" placeholder="Valor mensal">
+<input id="clienteEntrada" type="date">
+<button class="btn-add" onclick="adicionarCliente()">Adicionar</button>
+
+<h2>Lista de Clientes</h2>
+<table>
+<thead><tr><th>Cliente</th><th>Telefone</th><th>Valor</th><th>Entrada</th><th>Status</th><th>Ação</th></tr></thead>
+<tbody id="listaClientes"></tbody>
+</table>
+</div>
+
+<!-- POSTAGENS -->
+<div id="postagens" class="card" style="display:none">
+<h2>Adicionar Postagem</h2>
+<select id="postCliente"></select>
+<input id="postTitulo" placeholder="Título">
+<input id="postDescricao" placeholder="Descrição">
+<input id="postHora" type="time">
+<button class="btn-add" onclick="adicionarPostagem()">Adicionar</button>
+
+<h2>Lista de Postagens</h2>
+<table>
+<thead><tr><th>Cliente</th><th>Título</th><th>Descrição</th><th>Hora</th><th>Status</th><th>Ação</th></tr></thead>
+<tbody id="listaPostagens"></tbody>
+</table>
+</div>
+
+<!-- LEADS ANÚNCIOS -->
+<div id="leadsAnuncios" class="card" style="display:none">
+<h2>Leads de Anúncios</h2>
+<input id="leadNome" placeholder="Nome">
+<input id="leadTelefone" placeholder="Telefone">
+<button class="btn-add" onclick="adicionarLead()">Adicionar</button>
+<table>
+<thead><tr><th>Nome</th><th>Telefone</th><th>Ação</th></tr></thead>
+<tbody id="listaLeads"></tbody>
+</table>
+</div>
+
+<!-- REMARKETING -->
+<div id="remarketing" class="card" style="display:none">
+<h2>Remarketing</h2>
+<textarea id="remMensagem" placeholder="Mensagem padrão"></textarea>
+<button class="btn-add" onclick="adicionarRemarketing()">Adicionar todos leads pendentes</button>
+<table>
+<thead><tr><th>Nome</th><th>Telefone</th><th>Mensagem</th><th>Ação</th></tr></thead>
+<tbody id="listaRemarketing"></tbody>
+</table>
+</div>
+
+<!-- DISPARO -->
+<div id="disparo" class="card" style="display:none">
+<h2>Disparo de Mensagens WhatsApp</h2>
+<textarea id="msgDisparo" placeholder="Mensagem padrão"></textarea>
+<h3>Selecionar Clientes/Leads</h3>
+<div id="listaContatosDisparo"></div>
+<button class="btn-add" onclick="dispararMensagem()">Enviar WhatsApp</button>
+</div>
+
+<!-- FATURAMENTO -->
+<div id="faturamento" class="card" style="display:none">
+<h2>Faturamento</h2>
+<p>Total bruto: R$ <span id="faturamentoBruto">0</span></p>
+<p>Total líquido (50%): R$ <span id="faturamentoLiquido">0</span></p>
+</div>
+
+<script>
+// ALERTAS
+function criarAlerta(msg){const c=document.getElementById("alertContainer");const d=document.createElement("div");d.className="alert";d.innerText=msg;c.appendChild(d);setTimeout(()=>d.remove(),7000);}
+
+// DADOS
+let clientes=JSON.parse(localStorage.getItem("clientes"))||[];
+let postagens=JSON.parse(localStorage.getItem("postagens"))||[];
+let leads=JSON.parse(localStorage.getItem("leads"))||[];
+let remarketing=JSON.parse(localStorage.getItem("remarketing"))||[];
+
+function salvar(){
+  localStorage.setItem("clientes",JSON.stringify(clientes));
+  localStorage.setItem("postagens",JSON.stringify(postagens));
+  localStorage.setItem("leads",JSON.stringify(leads));
+  localStorage.setItem("remarketing",JSON.stringify(remarketing));
+  atualizarFaturamento();
+}
+
+// ABAS
+function mostrarAba(aba){
+  ["clientes","postagens","leadsAnuncios","remarketing","disparo","faturamento"].forEach(a=>{
+    document.getElementById(a).style.display=a===aba?"block":"none";
+  });
+}
+
+// CLIENTES
+function atualizarClientes(){
+  const tbody=document.getElementById("listaClientes"); tbody.innerHTML="";
+  clientes.forEach((c,i)=>{
+    const tr=document.createElement("tr");
+    tr.innerHTML=`<td>${c.nome}</td><td>${c.telefone}</td><td>R$ ${c.valor}</td><td>${c.entrada}</td><td>${c.status||'ativo'}</td>
+    <td><button class="btn-remove" onclick="removerCliente(${i})">Remover</button></td>`;
+    tbody.appendChild(tr);
+  });
+
+  // Dropdown postagens
+  const postSelect=document.getElementById("postCliente");
+  postSelect.innerHTML="";
+  clientes.forEach(c=>{
+    const o=document.createElement("option");o.value=c.nome;o.innerText=c.nome;postSelect.appendChild(o);
+  });
+
+  // Disparo
+  atualizarDisparo();
+  atualizarFaturamento();
+}
+
+function adicionarCliente(){
+  const n=document.getElementById("clienteNome").value;
+  const t=document.getElementById("clienteTelefone").value;
+  const v=parseFloat(document.getElementById("clienteValor").value);
+  const e=document.getElementById("clienteEntrada").value;
+  if(!n||!t||!v||!e){criarAlerta("Preencha todos os campos!");return;}
+  clientes.push({nome:n,telefone:t,valor:v,entrada:e,status:"ativo"});
+  salvar(); atualizarClientes();
+  document.getElementById("clienteNome").value="";document.getElementById("clienteTelefone").value="";document.getElementById("clienteValor").value="";document.getElementById("clienteEntrada").value="";
+}
+
+function removerCliente(i){clientes.splice(i,1);salvar();atualizarClientes();}
+
+// FATURAMENTO
+function atualizarFaturamento(){
+  const total=clientes.reduce((acc,c)=>acc+(c.valor||0),0);
+  document.getElementById("faturamentoBruto").innerText=total.toFixed(2);
+  document.getElementById("faturamentoLiquido").innerText=(total*0.5).toFixed(2);
+}
+
+// POSTAGENS
+function atualizarPostagens(){
+  const tbody=document.getElementById("listaPostagens"); tbody.innerHTML="";
+  postagens.forEach((p,i)=>{
+    const tr=document.createElement("tr");
+    const status=p.postado?"Postado":"Não postado";
+    tr.innerHTML=`<td>${p.cliente}</td><td>${p.titulo}</td><td>${p.descricao}</td><td>${p.hora}</td><td>${status}</td>
+    <td>
+    ${!p.postado?`<button class="btn-add" onclick="marcarPostado(${i})">Marcar Postado</button>`:""}
+    <button class="btn-remove" onclick="removerPostagem(${i})">Remover</button>
+    </td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function adicionarPostagem(){
+  const cliente=document.getElementById("postCliente").value;
+  const titulo=document.getElementById("postTitulo").value;
+  const descricao=document.getElementById("postDescricao").value;
+  const hora=document.getElementById("postHora").value;
+  if(!cliente||!titulo||!descricao||!hora){criarAlerta("Preencha todos os campos!");return;}
+  postagens.push({cliente,titulo,descricao,hora,postado:false});
+  salvar(); atualizarPostagens();
+  document.getElementById("postTitulo").value="";document.getElementById("postDescricao").value="";document.getElementById("postHora").value="";
+}
+
+function removerPostagem(i){postagens.splice(i,1);salvar();atualizarPostagens();}
+
+function marcarPostado(i){
+  postagens[i].postado=true;
+  salvar(); atualizarPostagens();
+  const cliente=clientes.find(c=>c.nome===postagens[i].cliente);
+  if(cliente){
+    const msg=`Olá ${cliente.nome}, sua arte já foi postada!`;
+    window.open(`https://wa.me/${cliente.telefone.replace(/\D/g,'')}?text=${encodeURIComponent(msg)}`,"_blank");
+    criarAlerta(`Mensagem enviada para ${cliente.nome}`);
+  }
+}
+
+// LEADS
+function atualizarLeads(){
+  const tbody=document.getElementById("listaLeads"); tbody.innerHTML="";
+  leads.forEach((l,i)=>{
+    const tr=document.createElement("tr");
+    tr.innerHTML=`<td>${l.nome}</td><td>${l.telefone}</td>
+    <td><button class="btn-add" onclick="enviarWhatsAppLead(${i})">Enviar WhatsApp</button>
+    <button class="btn-remove" onclick="removerLead(${i})">Remover</button></td>`;
+    tbody.appendChild(tr);
+  });
+  atualizarDisparo();
+}
+
+function adicionarLead(){
+  const n=document.getElementById("leadNome").value;
+  const t=document.getElementById("leadTelefone").value;
+  if(!n||!t){criarAlerta("Preencha todos os campos!");return;}
+  leads.push({nome:n,telefone:t});
+  salvar(); atualizarLeads();
+  document.getElementById("leadNome").value="";document.getElementById("leadTelefone").value="";
+}
+
+function removerLead(i){leads.splice(i,1);salvar();atualizarLeads();}
+
+function enviarWhatsAppLead(i){
+  const numero=leads[i].telefone.replace(/\D/g,'');
+  const msg=`Olá ${leads[i].nome}, estou entrando em contato via anúncio.`;
+  window.open(`https://wa.me/${numero}?text=${encodeURIComponent(msg)}`,"_blank");
+  criarAlerta(`Mensagem enviada para ${leads[i].nome}`);
+}
+
+// REMARKETING
+function adicionarRemarketing(){
+  const msg=document.getElementById("remMensagem").value;
+  if(!msg){criarAlerta("Digite a mensagem!");return;}
+  leads.forEach(l=>{
+    remarketing.push({nome:l.nome,telefone:l.telefone,mensagem:msg});
+  });
+  salvar(); atualizarRemarketing();
+}
+
+function atualizarRemarketing(){
+  const tbody=document.getElementById("listaRemarketing"); tbody.innerHTML="";
+  remarketing.forEach((r,i)=>{
+    const tr=document.createElement("tr");
+    tr.innerHTML=`<td>${r.nome}</td><td>${r.telefone}</td><td>${r.mensagem}</td>
+    <td><button class="btn-add" onclick="enviarWhatsAppRemarketing(${i})">Enviar WhatsApp</button></td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function enviarWhatsAppRemarketing(i){
+  const numero=remarketing[i].telefone.replace(/\D/g,'');
+  const msg=remarketing[i].mensagem;
+  window.open(`https://wa.me/${numero}?text=${encodeURIComponent(msg)}`,"_blank");
+  criarAlerta(`Mensagem enviada para ${remarketing[i].nome}`);
+}
+
+// DISPARO
+function atualizarDisparo(){
+  const div=document.getElementById("listaContatosDisparo");
+  div.innerHTML="";
+  [...clientes,...leads].forEach((c,i)=>{
+    const d=document.createElement("div");
+    const telefone=c.telefone||c.numero||"";
+    d.innerHTML=`<input type="checkbox" id="disp${i}" value="${telefone}"> ${c.nome} - ${telefone}`;
+    div.appendChild(d);
+  });
+}
+
+function dispararMensagem(){
+  const msg=document.getElementById("msgDisparo").value;
+  if(!msg){criarAlerta("Escreva uma mensagem!"); return;}
+  const checkboxes=document.querySelectorAll("#listaContatosDisparo input[type=checkbox]:checked");
+  if(checkboxes.length===0){criarAlerta("Selecione pelo menos um contato!"); return;}
+  checkboxes.forEach(c=>{
+    const numero=c.value.replace(/\D/g,'');
+    window.open(`https://wa.me/${numero}?text=${encodeURIComponent(msg)}`,"_blank");
+  });
+  criarAlerta("Mensagens abertas no WhatsApp!");
+}
+
+// INICIALIZAÇÃO
+atualizarClientes();
+atualizarPostagens();
+atualizarLeads();
+atualizarRemarketing();
+</script>
+
+</body>
+</html>
